@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// Firebase Cloud Storage Security Rules for ClassFlow
+// Enforces path isolation, role-based access, file size limits (10 MB), and permitted document MIME types / extensions.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default-Deny Catch-All
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedTutor() {
+      return isVerifiedUser() && request.auth.token.email == 'gabrieljude757@gmail.com';
+    }
+
+    function isTutor() {
+      return isVerifiedUser() && (
+        isBootstrappedTutor() ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'tutor'
+      );
+    }
+
+    function isValidFileName(fileName) {
+      return fileName is string
+        && fileName.size() >= 1
+        && fileName.size() <= 255
+        && fileName.matches('.*\\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt|zip|PDF|DOC|DOCX|PPT|PPTX|XLS|XLSX|TXT|ZIP)$');
+    }
+
+    function isValidUploadSize() {
+      // Max 10 MB
+      return request.resource != null && request.resource.size > 0 && request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // 1. Tutor Assignment Attachments: assignments/{assignmentId}/{fileName}
+    match /assignments/{assignmentId}/{fileName} {
+      // Any authenticated student or tutor may download published assignment files
+      allow read: if isSignedIn();
+      // Only verified tutors may upload or replace assignment attachments
+      allow write: if isTutor() && isValidFileName(fileName) && isValidUploadSize();
+    }
+
+    // 2. Student Submission Files: submissions/{assignmentId}/{studentId}/{fileName}
+    match /submissions/{assignmentId}/{studentId}/{fileName} {
+      // Only the submitting student themselves or an authorized tutor may download the submission
+      allow read: if isSignedIn() && (request.auth.uid == studentId || isTutor());
+      // Only the owning student may upload into their own {studentId} directory
+      allow write: if isVerifiedUser()
+        && request.auth.uid == studentId
+        && isValidFileName(fileName)
+        && isValidUploadSize();
+    }
+  }
+}

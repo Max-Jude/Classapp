@@ -1,0 +1,490 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default-Deny Catch-All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return request.auth != null && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.firebase.sign_in_provider == 'password'
+      );
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'gabrieljude757@gmail.com';
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        isBootstrappedAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approvalStatus', 'approved') == 'approved')
+      );
+    }
+
+    function isApprovedUser() {
+      return isVerifiedUser() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approvalStatus', 'approved') == 'approved')
+      );
+    }
+
+    function isTutor() {
+      return isVerifiedUser() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tutor' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approvalStatus', 'approved') == 'approved')
+      );
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll([
+          'uid', 'name', 'email', 'role', 'approvalStatus', 'department', 'studentCode', 'bio', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'name', 'email', 'role', 'approvalStatus', 'department', 'studentCode', 'bio', 'createdAt', 'updatedAt'
+        ]) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.role is string && data.role in ['student', 'tutor', 'admin'] &&
+        data.approvalStatus is string && data.approvalStatus in ['pending', 'approved', 'rejected'] &&
+        data.department is string && data.department.size() <= 100 &&
+        data.studentCode is string && data.studentCode.size() <= 40 &&
+        data.bio is string && data.bio.size() <= 500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDirectoryEntry(data) {
+      return data.keys().hasAll([
+          'uid', 'name', 'role', 'approvalStatus', 'department', 'studentCode', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'name', 'role', 'approvalStatus', 'department', 'studentCode', 'createdAt', 'updatedAt'
+        ]) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.role is string && data.role in ['student', 'tutor', 'admin'] &&
+        data.approvalStatus is string && data.approvalStatus in ['pending', 'approved', 'rejected'] &&
+        data.department is string && data.department.size() <= 100 &&
+        data.studentCode is string && data.studentCode.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTutorBootstrap(data) {
+      return data.keys().hasAll(['primaryTutorUid', 'createdAt']) &&
+        data.keys().hasOnly(['primaryTutorUid', 'createdAt']) &&
+        data.primaryTutorUid is string && data.primaryTutorUid.size() >= 1 && data.primaryTutorUid.size() <= 128 && data.primaryTutorUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidTutorAuthorization(data) {
+      return data.keys().hasAll(['targetUid', 'authorizedByUid', 'createdAt']) &&
+        data.keys().hasOnly(['targetUid', 'authorizedByUid', 'createdAt']) &&
+        data.targetUid is string && data.targetUid.size() >= 1 && data.targetUid.size() <= 128 && data.targetUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.authorizedByUid is string && data.authorizedByUid.size() >= 1 && data.authorizedByUid.size() <= 128 && data.authorizedByUid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'subject', 'description', 'instructions', 'tutorId', 'tutorName',
+          'deadline', 'maxPoints', 'status', 'attachmentName', 'attachmentPath',
+          'attachmentUrl', 'attachmentSize', 'publishedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'title', 'subject', 'description', 'instructions', 'tutorId', 'tutorName',
+          'deadline', 'maxPoints', 'status', 'attachmentName', 'attachmentPath',
+          'attachmentUrl', 'attachmentSize', 'publishedAt', 'allowLateSubmissions',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 160 &&
+        data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 80 &&
+        data.description is string && data.description.size() >= 5 && data.description.size() <= 1000 &&
+        data.instructions is string && data.instructions.size() >= 10 && data.instructions.size() <= 5000 &&
+        data.tutorId is string && data.tutorId.size() >= 1 && data.tutorId.size() <= 128 && data.tutorId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.tutorName is string && data.tutorName.size() >= 1 && data.tutorName.size() <= 100 &&
+        data.deadline is string && data.deadline.size() >= 10 && data.deadline.size() <= 40 &&
+        data.maxPoints is number && data.maxPoints >= 1 && data.maxPoints <= 100 &&
+        data.status is string && data.status in ['draft', 'published', 'archived'] &&
+        data.attachmentName is string && data.attachmentName.size() <= 255 &&
+        data.attachmentPath is string && data.attachmentPath.size() <= 500 &&
+        data.attachmentUrl is string && data.attachmentUrl.size() <= 2000 &&
+        data.attachmentSize is number && data.attachmentSize >= 0 && data.attachmentSize <= 10485760 &&
+        data.publishedAt is string && data.publishedAt.size() <= 40 &&
+        (!('allowLateSubmissions' in data) || data.allowLateSubmissions is bool) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'message', 'subject', 'priority',
+          'authorId', 'authorName', 'authorRole', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'title', 'message', 'subject', 'priority',
+          'authorId', 'authorName', 'authorRole', 'createdAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 160 &&
+        data.message is string && data.message.size() >= 5 && data.message.size() <= 2000 &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 80 &&
+        data.priority is string && data.priority in ['normal', 'important', 'urgent'] &&
+        data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 && data.authorId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100 &&
+        data.authorRole is string && data.authorRole in ['tutor', 'admin'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll([
+          'id', 'assignmentId', 'assignmentTitle', 'subject', 'tutorId', 'studentId',
+          'studentName', 'studentCode', 'fileName', 'storagePath', 'fileUrl', 'fileSize',
+          'notes', 'status', 'grade', 'feedback', 'gradedBy', 'gradedAt',
+          'submittedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'assignmentId', 'assignmentTitle', 'subject', 'tutorId', 'studentId',
+          'studentName', 'studentCode', 'fileName', 'storagePath', 'fileUrl', 'fileSize',
+          'notes', 'status', 'grade', 'feedback', 'gradedBy', 'gradedAt',
+          'submittedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.assignmentId is string && data.assignmentId.size() >= 1 && data.assignmentId.size() <= 128 && data.assignmentId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.assignmentTitle is string && data.assignmentTitle.size() >= 1 && data.assignmentTitle.size() <= 160 &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 80 &&
+        data.tutorId is string && data.tutorId.size() >= 1 && data.tutorId.size() <= 128 && data.tutorId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 && data.studentId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 100 &&
+        data.studentCode is string && data.studentCode.size() <= 40 &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255 &&
+        data.storagePath is string && data.storagePath.size() >= 1 && data.storagePath.size() <= 500 &&
+        data.fileUrl is string && data.fileUrl.size() >= 1 && data.fileUrl.size() <= 2000 &&
+        data.fileSize is number && data.fileSize >= 1 && data.fileSize <= 10485760 &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        data.status is string && data.status in ['in_progress', 'submitted', 'graded'] &&
+        data.grade is number && data.grade >= -1 && data.grade <= 100 &&
+        data.feedback is string && data.feedback.size() <= 3000 &&
+        data.gradedBy is string && data.gradedBy.size() <= 128 &&
+        data.gradedAt is string && data.gradedAt.size() <= 40 &&
+        data.submittedAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidFileContent(data) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'assignmentId', 'category', 'fileName', 'mimeType', 'size', 'dataUrl', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'assignmentId', 'category', 'fileName', 'mimeType', 'size', 'dataUrl', 'createdAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.assignmentId is string && data.assignmentId.size() >= 1 && data.assignmentId.size() <= 128 && data.assignmentId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.category is string && data.category in ['assignment', 'submission'] &&
+        data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255 &&
+        data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 120 &&
+        data.size is number && data.size >= 1 && data.size <= 10485760 &&
+        data.dataUrl is string && data.dataUrl.size() >= 1 && data.dataUrl.size() <= 900000 &&
+        data.createdAt is timestamp;
+    }
+
+    // 4. Collection Match Blocks
+
+    // Private User Profiles (contains PII: email)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isTutor() || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUser(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/directory/$(userId))
+        && getAfter(/databases/$(database)/documents/directory/$(userId)).data.role == incoming().role
+        && getAfter(/databases/$(database)/documents/directory/$(userId)).data.approvalStatus == incoming().approvalStatus
+        && (
+          // Standard Student or Tutor enrollment starts as 'pending' awaiting Admin admission
+          (incoming().role in ['student', 'tutor'] && incoming().approvalStatus == 'pending')
+          ||
+          // Bootstrapped Super-Admin account is automatically 'approved'
+          (isBootstrappedAdmin() && incoming().approvalStatus == 'approved')
+        );
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/directory/$(userId))
+        && getAfter(/databases/$(database)/documents/directory/$(userId)).data.role == incoming().role
+        && getAfter(/databases/$(database)/documents/directory/$(userId)).data.approvalStatus == incoming().approvalStatus
+        && (
+          // Action 1: User updates their own profile details (role, approvalStatus & studentCode unchanged)
+          (request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().studentCode == existing().studentCode
+            && incoming().approvalStatus == existing().get('approvalStatus', 'approved')
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'department', 'studentCode', 'bio', 'approvalStatus', 'updatedAt'
+            ]))
+          ||
+          // Action 2: Admin approves, declines, or updates role of any user (or switches own view mode)
+          (isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'role', 'approvalStatus', 'name', 'department', 'studentCode', 'bio', 'updatedAt'
+            ]))
+        );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Non-PII Institutional Roster Directory
+    match /directory/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && (
+        existing().role in ['student', 'tutor', 'admin']
+      );
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidDirectoryEntry(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/users/$(userId))
+        && getAfter(/databases/$(database)/documents/users/$(userId)).data.role == incoming().role
+        && getAfter(/databases/$(database)/documents/users/$(userId)).data.approvalStatus == incoming().approvalStatus
+        && (
+          (incoming().role in ['student', 'tutor'] && incoming().approvalStatus == 'pending')
+          ||
+          (isBootstrappedAdmin() && incoming().approvalStatus == 'approved')
+        );
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidDirectoryEntry(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/users/$(userId))
+        && getAfter(/databases/$(database)/documents/users/$(userId)).data.role == incoming().role
+        && getAfter(/databases/$(database)/documents/users/$(userId)).data.approvalStatus == incoming().approvalStatus
+        && (
+          (request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().studentCode == existing().studentCode
+            && incoming().approvalStatus == existing().get('approvalStatus', 'approved')
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'department', 'studentCode', 'approvalStatus', 'updatedAt'
+            ]))
+          ||
+          (isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'role', 'approvalStatus', 'name', 'department', 'studentCode', 'updatedAt'
+            ]))
+        );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Singleton Tutor Bootstrap Lock
+    match /systemConfig/{configId} {
+      allow get: if isSignedIn() && isValidId(configId) && configId == 'tutorBootstrap';
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isValidId(configId)
+        && configId == 'tutorBootstrap'
+        && isValidTutorBootstrap(incoming())
+        && incoming().primaryTutorUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && !exists(/databases/$(database)/documents/systemConfig/tutorBootstrap);
+      allow update, delete: if false;
+    }
+
+    // Tutor Role Authorizations
+    match /tutorAuthorizations/{targetUid} {
+      allow get: if isSignedIn() && isValidId(targetUid) && (request.auth.uid == targetUid || isTutor() || isAdmin());
+      allow list: if isSignedIn() && (existing().targetUid == request.auth.uid || existing().authorizedByUid == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser()
+        && isValidId(targetUid)
+        && isValidTutorAuthorization(incoming())
+        && incoming().targetUid == targetUid
+        && incoming().authorizedByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && (isTutor() || isAdmin());
+      allow update, delete: if false;
+    }
+
+    // Course Assignments (Requires Approved User / Approved Tutor)
+    match /assignments/{assignmentId} {
+      allow get: if isApprovedUser() && isValidId(assignmentId) && (
+        existing().status == 'published' || existing().tutorId == request.auth.uid || isTutor() || isAdmin()
+      );
+      allow list: if isApprovedUser() && (
+        existing().status == 'published' || existing().tutorId == request.auth.uid || isAdmin()
+      );
+      allow create: if isVerifiedUser()
+        && isValidId(assignmentId)
+        && isValidAssignment(incoming())
+        && incoming().id == assignmentId
+        && incoming().tutorId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isTutor();
+      allow update: if isVerifiedUser()
+        && isValidId(assignmentId)
+        && isValidAssignment(incoming())
+        && incoming().id == existing().id
+        && incoming().tutorId == existing().tutorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existing().status != 'archived'
+        && isTutor()
+        && (request.auth.uid == existing().tutorId || isAdmin())
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'subject', 'description', 'instructions', 'tutorName',
+            'deadline', 'maxPoints', 'status', 'attachmentName', 'attachmentPath',
+            'attachmentUrl', 'attachmentSize', 'publishedAt', 'allowLateSubmissions', 'updatedAt'
+          ])
+        );
+      allow delete: if isVerifiedUser()
+        && isValidId(assignmentId)
+        && isTutor()
+        && (request.auth.uid == existing().tutorId || isAdmin());
+    }
+
+    // Course & Institutional Announcements
+    match /announcements/{announcementId} {
+      allow get: if isApprovedUser() && isValidId(announcementId);
+      allow list: if isApprovedUser() && (
+        existing().priority in ['normal', 'important', 'urgent']
+      );
+      allow create: if isVerifiedUser()
+        && isValidId(announcementId)
+        && isValidAnnouncement(incoming())
+        && incoming().id == announcementId
+        && incoming().authorId == request.auth.uid
+        && incoming().createdAt == request.time
+        && (isTutor() || isAdmin());
+      allow update: if false;
+      allow delete: if isVerifiedUser()
+        && isValidId(announcementId)
+        && (isAdmin() || (isTutor() && existing().authorId == request.auth.uid));
+    }
+
+    // Student Submissions (Requires Approved User)
+    match /submissions/{submissionId} {
+      allow get: if isApprovedUser() && isValidId(submissionId) && (
+        existing().studentId == request.auth.uid || existing().tutorId == request.auth.uid || isTutor() || isAdmin()
+      );
+      allow list: if isApprovedUser() && (
+        existing().studentId == request.auth.uid || existing().tutorId == request.auth.uid || isAdmin()
+      );
+      allow create: if isApprovedUser()
+        && isValidId(submissionId)
+        && isValidSubmission(incoming())
+        && incoming().id == submissionId
+        && incoming().studentId == request.auth.uid
+        && incoming().status in ['in_progress', 'submitted']
+        && incoming().grade == -1
+        && incoming().feedback == ''
+        && incoming().gradedBy == ''
+        && incoming().gradedAt == ''
+        && incoming().submittedAt == request.time
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/assignments/$(incoming().assignmentId))
+        && get(/databases/$(database)/documents/assignments/$(incoming().assignmentId)).data.status == 'published'
+        && get(/databases/$(database)/documents/assignments/$(incoming().assignmentId)).data.tutorId == incoming().tutorId;
+      allow update: if isApprovedUser()
+        && isValidId(submissionId)
+        && isValidSubmission(incoming())
+        && incoming().id == existing().id
+        && incoming().assignmentId == existing().assignmentId
+        && incoming().tutorId == existing().tutorId
+        && incoming().studentId == existing().studentId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Student updates or replaces submission prior to grading
+          (request.auth.uid == existing().studentId
+            && existing().status != 'graded'
+            && incoming().status in ['in_progress', 'submitted']
+            && incoming().grade == existing().grade
+            && incoming().feedback == existing().feedback
+            && incoming().gradedBy == existing().gradedBy
+            && incoming().gradedAt == existing().gradedAt
+            && incoming().submittedAt == request.time
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'fileName', 'storagePath', 'fileUrl', 'fileSize', 'notes', 'status', 'submittedAt', 'updatedAt'
+            ]))
+          ||
+          // Action 2: Tutor or Admin grades submission and records feedback
+          (isTutor()
+            && (request.auth.uid == existing().tutorId || isAdmin())
+            && incoming().status == 'graded'
+            && incoming().grade >= 0
+            && incoming().grade <= 100
+            && incoming().gradedBy == request.auth.uid
+            && incoming().gradedAt.size() >= 10
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'grade', 'feedback', 'gradedBy', 'gradedAt', 'updatedAt'
+            ]))
+        );
+      allow delete: if false;
+    }
+
+    // Protected File Blobs (Requires Approved User)
+    match /fileContents/{fileId} {
+      allow get: if isApprovedUser() && isValidId(fileId) && (
+        existing().ownerId == request.auth.uid || existing().category == 'assignment' || isTutor() || isAdmin()
+      );
+      allow list: if false;
+      allow create: if isApprovedUser()
+        && isValidId(fileId)
+        && isValidFileContent(incoming())
+        && incoming().id == fileId
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/assignments/$(incoming().assignmentId))
+        && (
+          (incoming().category == 'assignment' && isTutor()) ||
+          (incoming().category == 'submission' &&
+            get(/databases/$(database)/documents/assignments/$(incoming().assignmentId)).data.status == 'published')
+        );
+      allow update, delete: if false;
+    }
+  }
+}

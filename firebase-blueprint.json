@@ -1,0 +1,633 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Private user account record containing PII (email) and role metadata.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the user"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Full display name of the student or tutor"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254,
+          "description": "Email address of the user (PII)"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "tutor"],
+          "description": "Role of the user in ClassFlow"
+        },
+        "department": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100,
+          "description": "Academic department or subject track"
+        },
+        "studentCode": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "Student or instructor identification code"
+        },
+        "bio": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500,
+          "description": "Short academic biography or notes"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when account was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when account was last updated"
+        }
+      },
+      "required": [
+        "uid",
+        "name",
+        "email",
+        "role",
+        "department",
+        "studentCode",
+        "bio",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DirectoryEntry": {
+      "title": "DirectoryEntry",
+      "description": "Non-PII institutional roster profile for students and tutors.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Full display name"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "tutor"],
+          "description": "User role"
+        },
+        "department": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100,
+          "description": "Academic department"
+        },
+        "studentCode": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "Institutional ID code"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "uid",
+        "name",
+        "role",
+        "department",
+        "studentCode",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TutorBootstrap": {
+      "title": "TutorBootstrap",
+      "description": "Singleton lock document recording the initial tutor setup.",
+      "type": "object",
+      "properties": {
+        "primaryTutorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the initial bootstrapped tutor"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        }
+      },
+      "required": ["primaryTutorUid", "createdAt"]
+    },
+    "TutorAuthorization": {
+      "title": "TutorAuthorization",
+      "description": "Authorization record created by an existing tutor to grant tutor role privileges to another user UID.",
+      "type": "object",
+      "properties": {
+        "targetUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the user authorized to become a tutor"
+        },
+        "authorizedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the tutor who granted authorization"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        }
+      },
+      "required": ["targetUid", "authorizedByUid", "createdAt"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Course assignment created and managed by a tutor.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Document ID of the assignment"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160,
+          "description": "Assignment title"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Subject or course category"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1000,
+          "description": "Executive summary of the assignment"
+        },
+        "instructions": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 5000,
+          "description": "Detailed instructions and grading criteria"
+        },
+        "tutorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the tutor who created the assignment"
+        },
+        "tutorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the tutor"
+        },
+        "deadline": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 40,
+          "description": "ISO 8601 deadline string"
+        },
+        "maxPoints": {
+          "type": "number",
+          "description": "Maximum possible score (1 to 100)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "published", "archived"],
+          "description": "Publication status of the assignment"
+        },
+        "attachmentName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 255,
+          "description": "File name of attached resource"
+        },
+        "attachmentPath": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500,
+          "description": "Storage path of attached resource"
+        },
+        "attachmentUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2000,
+          "description": "Download URL or blob reference ID"
+        },
+        "attachmentSize": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "publishedAt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "ISO 8601 timestamp when published"
+        },
+        "allowLateSubmissions": {
+          "type": "boolean",
+          "description": "Whether students can submit work after the deadline (flagged as LATE)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "subject",
+        "description",
+        "instructions",
+        "tutorId",
+        "tutorName",
+        "deadline",
+        "maxPoints",
+        "status",
+        "attachmentName",
+        "attachmentPath",
+        "attachmentUrl",
+        "attachmentSize",
+        "publishedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Student assignment submission record with file metadata, status, grade, and feedback.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Submission document ID"
+        },
+        "assignmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Referenced assignment ID"
+        },
+        "assignmentTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Snapshot of assignment title"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Subject category"
+        },
+        "tutorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the assignment tutor"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the submitting student"
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the submitting student"
+        },
+        "studentCode": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "Student ID code"
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Uploaded submission file name"
+        },
+        "storagePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Firebase Storage path"
+        },
+        "fileUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "Download URL or file reference"
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Uploaded file size in bytes"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000,
+          "description": "Optional submission comment from student"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["in_progress", "submitted", "graded"],
+          "description": "Authoritative submission workflow state"
+        },
+        "grade": {
+          "type": "number",
+          "description": "Numeric score from 0 to 100 (-1 when ungraded)"
+        },
+        "feedback": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 3000,
+          "description": "Tutor evaluation feedback"
+        },
+        "gradedBy": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128,
+          "description": "UID of tutor who graded"
+        },
+        "gradedAt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "ISO timestamp when graded"
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when submitted"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when first created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when last updated"
+        }
+      },
+      "required": [
+        "id",
+        "assignmentId",
+        "assignmentTitle",
+        "subject",
+        "tutorId",
+        "studentId",
+        "studentName",
+        "studentCode",
+        "fileName",
+        "storagePath",
+        "fileUrl",
+        "fileSize",
+        "notes",
+        "status",
+        "grade",
+        "feedback",
+        "gradedBy",
+        "gradedAt",
+        "submittedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FileContent": {
+      "title": "FileContent",
+      "description": "Secure file payload store for assignment attachments and student submissions.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "File document ID"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of user who uploaded the file"
+        },
+        "assignmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated assignment ID"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["assignment", "submission"],
+          "description": "Whether this is a tutor assignment file or student submission"
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Original file name"
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "MIME type of the file"
+        },
+        "size": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "dataUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 900000,
+          "description": "Base64 data URL payload"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "assignmentId",
+        "category",
+        "fileName",
+        "mimeType",
+        "size",
+        "dataUrl",
+        "createdAt"
+      ]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Course or institutional announcement posted by a Tutor or Admin.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Announcement document ID"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160,
+          "description": "Announcement headline"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 2000,
+          "description": "Announcement body content"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Course or department scope (e.g., All Courses, Computer Science)"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["normal", "important", "urgent"],
+          "description": "Urgency level of the announcement"
+        },
+        "authorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the Tutor or Admin who posted the announcement"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the author"
+        },
+        "authorRole": {
+          "type": "string",
+          "enum": ["tutor", "admin"],
+          "description": "Role of the author"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "message",
+        "subject",
+        "priority",
+        "authorId",
+        "authorName",
+        "authorRole",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Private user account records containing email (PII) and role metadata."
+    },
+    "/directory/{userId}": {
+      "schema": { "$ref": "#/entities/DirectoryEntry" },
+      "description": "Non-PII institutional directory profiles for students and tutors."
+    },
+    "/systemConfig/{configId}": {
+      "schema": { "$ref": "#/entities/TutorBootstrap" },
+      "description": "Singleton bootstrap lock document for initial tutor setup."
+    },
+    "/tutorAuthorizations/{targetUid}": {
+      "schema": { "$ref": "#/entities/TutorAuthorization" },
+      "description": "Tutor role authorization records created by existing tutors."
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Course assignments published and managed by tutors."
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/Submission" },
+      "description": "Student assignment submissions, status tracking, grades, and tutor feedback."
+    },
+    "/fileContents/{fileId}": {
+      "schema": { "$ref": "#/entities/FileContent" },
+      "description": "Protected file content blobs for assignment attachments and student submissions."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Course and institutional announcements posted by tutors and admins."
+    }
+  }
+}

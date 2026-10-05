@@ -1,0 +1,6 @@
+{
+  "name": "ClassFlow",
+  "description": "Full-stack student and tutor assignment management platform with role-based dashboards, secure submissions, and real-time grading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
