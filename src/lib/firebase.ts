@@ -2,7 +2,21 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import appletConfig from '../../firebase-applet-config.json';
+
+/**
+ * Default public Firebase Web SDK configuration for ClassFlow.
+ * Can be overridden at build time via VITE_FIREBASE_* environment variables
+ * (e.g., in Cloudflare Workers / Pages or Netlify build settings).
+ */
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyA2rsn6VUL4VtBuMC44diIBaHOzmPwfiaY',
+  authDomain: 'resolute-hold-d40ks.firebaseapp.com',
+  projectId: 'resolute-hold-d40ks',
+  storageBucket: 'resolute-hold-d40ks.firebasestorage.app',
+  messagingSenderId: '857176816166',
+  appId: '1:857176816166:web:2e3db6f0c30513312844e7',
+  firestoreDatabaseId: 'ai-studio-classflow-ea43a33f-29b5-4f0a-8425-1c01b6bacbd9',
+};
 
 function resolveEnv(envValue: string | undefined, fallback: string): string {
   if (!envValue) return fallback;
@@ -19,21 +33,27 @@ function resolveEnv(envValue: string | undefined, fallback: string): string {
 }
 
 const firebaseConfig = {
-  apiKey: resolveEnv(import.meta.env.VITE_FIREBASE_API_KEY, appletConfig.apiKey),
-  authDomain: resolveEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, appletConfig.authDomain),
-  projectId: resolveEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID, appletConfig.projectId),
+  apiKey: resolveEnv(import.meta.env.VITE_FIREBASE_API_KEY, DEFAULT_FIREBASE_CONFIG.apiKey),
+  authDomain: resolveEnv(
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    DEFAULT_FIREBASE_CONFIG.authDomain
+  ),
+  projectId: resolveEnv(
+    import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    DEFAULT_FIREBASE_CONFIG.projectId
+  ),
   storageBucket: resolveEnv(
     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    appletConfig.storageBucket
+    DEFAULT_FIREBASE_CONFIG.storageBucket
   ),
   messagingSenderId: resolveEnv(
     import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appletConfig.messagingSenderId
+    DEFAULT_FIREBASE_CONFIG.messagingSenderId
   ),
-  appId: resolveEnv(import.meta.env.VITE_FIREBASE_APP_ID, appletConfig.appId),
+  appId: resolveEnv(import.meta.env.VITE_FIREBASE_APP_ID, DEFAULT_FIREBASE_CONFIG.appId),
   firestoreDatabaseId: resolveEnv(
     import.meta.env.VITE_FIREBASE_DATABASE_ID,
-    appletConfig.firestoreDatabaseId
+    DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId
   ),
 };
 
